@@ -57,7 +57,7 @@ Trace the upstream dependency chain from any asset. Control traversal depth and 
 Upload a `BuildLayout.json` directly from the browser. Progress is streamed in real time.
 
 ### Snapshot Management
-Edit tags and comments on snapshots. Soft-delete old ones to keep the list clean.
+Edit tags and comments on snapshots. Soft-delete old ones to keep the list clean. Snapshots older than `SNAPSHOT_RETENTION_DAYS` (default 90) and snapshots superseded by a re-upload of the same platform / version / tag are physically deleted on each upload.
 
 ---
 

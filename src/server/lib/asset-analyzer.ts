@@ -5,6 +5,8 @@ import { pick } from 'stream-json/filters/Pick';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 import StreamObject from 'stream-json/streamers/StreamObject';
 import { prisma } from '@/server/lib/db';
+import { env } from '@/server/lib/env';
+import { findStaleSnapshotIds, purgeSnapshots } from '@/server/lib/snapshot-cleanup';
 import { asset_entries, asset_links, Prisma } from "@prisma/client"
 
 import "server-only"
@@ -69,28 +71,6 @@ export async function analyzeBuildLayout(
         const snapshot_meta = await extractSnapshotMetadata(path);
         console.log(`[analyzeBuildLayout] metadata: platform=${snapshot_meta.platform} playerVersion=${snapshot_meta.playerVersion} buildTime=${snapshot_meta.buildTime.toISOString()}`);
 
-        const snapshot_ids = await prisma.asset_snapshots.findMany({
-            where: {
-                platform: snapshot_meta.platform,
-                player_version: snapshot_meta.playerVersion,
-                tag: tag,
-            },
-            select: { id: true },
-        });
-
-        if (snapshot_ids.length > 0) {
-            console.log(`[analyzeBuildLayout] marking ${snapshot_ids.length} existing snapshot(s) as deleted`)
-        }
-
-        for (const s of snapshot_ids) {
-            await prisma.asset_snapshots.update({
-                where: { id: s.id },
-                data: {
-                    deleted: true,
-                },
-            });
-        }
-
         step.mark(uuid, "Parsing BuildLayout.json...");
         await sleep(5);
 
@@ -102,7 +82,7 @@ export async function analyzeBuildLayout(
         await sleep(5);
 
         const dbStart = Date.now();
-        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const snapshot = await tx.asset_snapshots.create({
                 data: {
                     platform: snapshot_meta.platform,
@@ -130,6 +110,18 @@ export async function analyzeBuildLayout(
             return snapshot;
         }, { timeout: 120_000 });
         console.log(`[analyzeBuildLayout] db save done: elapsed=${Date.now() - dbStart}ms`);
+
+        step.mark(uuid, "Cleaning up old snapshots...");
+        try {
+            const stale = await findStaleSnapshotIds(created, env.SNAPSHOT_RETENTION_DAYS);
+            if (stale.length > 0) {
+                console.log(`[analyzeBuildLayout] purging ${stale.length} stale snapshot(s): ${stale.join(',')}`);
+                await purgeSnapshots(stale);
+            }
+        } catch (err) {
+            // The upload is already committed; a failed cleanup must not turn it into a 500.
+            console.error(`[analyzeBuildLayout] cleanup failed uuid=${uuid}`, err);
+        }
 
         fs.unlink(path, () => { });
         step.mark(uuid, "Done!");

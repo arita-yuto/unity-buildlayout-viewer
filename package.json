@@ -69,7 +69,7 @@
     "@types/stream-json": "^1.7.8",
     "prisma": "^6.5.0",
     "server-only": "^0.0.1",
-    "stream-json": "^3.7.0",
+    "stream-json": "^1.9.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "tw-animate-css": "^1.3.5",

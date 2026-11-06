@@ -8,7 +8,7 @@ datasource db {
 }
 
 model asset_entries {
-  id            Int              @id @default(autoincrement())
+  id            BigInt           @id @default(autoincrement())
   snapshot_id   Int?
   rid           Int?
   class_name    String?
@@ -24,7 +24,7 @@ model asset_entries {
 }
 
 model asset_links {
-  id          Int              @id @default(autoincrement())
+  id          BigInt           @id @default(autoincrement())
   snapshot_id Int?
   from_id     Int?
   to_id       Int?
